@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=audoldm_train
-#SBATCH --output=logs/%x_%j.out       # Standard output log
-#SBATCH --error=logs/%x_%j.err        # Standard error log
+#SBATCH --output=cluster_logs/%x_%j.out       # Standard output log
+#SBATCH --error=cluster_logs/%x_%j.err        # Standard error log
 #SBATCH --partition=2080ti  # Example for 2080ti partition
 #SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=4
@@ -34,14 +34,14 @@ else
 fi
 
 
-set -e  # Exit on any error
+# set -e  # Exit on any error
 
-# Set the trap for errors
-trap 'echo "An error occurred while running the Python script. Exiting..." >&2; exit 1' ERR
+# # Set the trap for errors
+# trap 'echo "An error occurred while running the Python script. Exiting..." >&2; exit 1' ERR
 
-# Try block
-echo "Running the Python script..."
-python3 audioldm_train_instruction.py  # If this fails, the trap will catch it
+# # Try block
+# echo "Running the Python script..."
+# python3 audioldm_train_instruction.py  # If this fails, the trap will catch it
 
-# If successful
-echo "Python script ran successfully."
+# # If successful
+# echo "Python script ran successfully."
