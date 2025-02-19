@@ -1,5 +1,6 @@
 __pycache__
 taming
+logs
 log
 esc50.zip
 ESC-50-master
@@ -16,3 +17,5 @@ checkpoints
 *.tar
 condor*
 wandb
+*.mlx_submit
+*.ipynb
