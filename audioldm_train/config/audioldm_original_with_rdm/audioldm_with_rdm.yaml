@@ -7,14 +7,14 @@ variables:
   sampling_rate: &sampling_rate 16000 
   mel_bins: &mel_bins 64
   latent_embed_dim: &latent_embed_dim 8
-  latent_t_size: &latent_t_size 256 # TODO might need to change
+  latent_t_size: &latent_t_size 256
   latent_f_size: &latent_f_size 16
   in_channels: &unet_in_channels 8
   optimize_ddpm_parameter: &optimize_ddpm_parameter true
   optimize_gpt: &optimize_gpt true
   warmup_steps: &warmup_steps 2000
 
-data: 
+data:
   train: ["audiocaps"]
   val: "audiocaps"
   test: "audiocaps"
@@ -24,7 +24,6 @@ data:
 step:
   validation_every_n_epochs: 5
   save_checkpoint_every_n_steps: 5000
-  # limit_val_batches: 2
   max_steps: 800000
   save_top_k: 1
 
@@ -48,7 +47,7 @@ augmentation:
 model:
   target: audioldm_train.modules.latent_diffusion.ddpm.LatentDiffusion
   params: 
-    # Autoencoder
+    # VAE Encoder (Autoencoder)
     first_stage_config:
       base_learning_rate: 8.0e-06
       target: audioldm_train.modules.latent_encoder.autoencoder.AutoencoderKL
@@ -70,7 +69,7 @@ model:
             disc_in_channels: 1
         ddconfig: 
           double_z: true
-          mel_bins: *mel_bins # The frequency bins of mel spectrogram
+          mel_bins: *mel_bins
           z_channels: 8
           resolution: 256
           downsample_time: false
@@ -84,8 +83,8 @@ model:
           num_res_blocks: 2
           attn_resolutions: []
           dropout: 0.0
-    
-    # Other parameters
+
+    # Diffusion Model
     base_learning_rate: 1.0e-4
     warmup_steps: *warmup_steps
     optimize_ddpm_parameter: *optimize_ddpm_parameter
@@ -97,48 +96,35 @@ model:
     log_every_t: 200
     timesteps: 1000
     unconditional_prob_cfg: 0.1
-    parameterization: eps # [eps, x0, v]
+    parameterization: eps
     first_stage_key: fbank
-    latent_t_size: *latent_t_size # TODO might need to change
+    latent_t_size: *latent_t_size
     latent_f_size: *latent_f_size
-    channels: *latent_embed_dim # TODO might need to change
+    channels: *latent_embed_dim
     monitor: val/loss_simple_ema
     scale_by_std: true
+
+    # UNet model (Replacing RDM's model with a suitable AudioLDM equivalent)
     unet_config:
-      target: audioldm_train.modules.diffusionmodules.openaimodel.UNetModel
+      target: audioldm_train.rdm.modules.diffusionmodules.latentmlp.SimpleMLP
       params:
-        image_size: 64 
-        extra_film_condition_dim: 512 # If you use film as extra condition, set this parameter. For example if you have two conditioning vectors each have dimension 512, then this number would be 1024
-        # context_dim: 
-        # - 768
-        in_channels: *unet_in_channels # The input channel of the UNet model
-        out_channels: *latent_embed_dim # TODO might need to change
-        model_channels: 128 # TODO might need to change
-        attention_resolutions:
-        - 8
-        - 4
-        - 2
-        num_res_blocks: 2
-        channel_mult: 
-        - 1
-        - 2
-        - 3
-        - 5
-        num_head_channels: 32
-        use_spatial_transformer: true
-        transformer_depth: 1
-        extra_sa_layer: false
-    
+        in_channels: *latent_embed_dim
+        time_embed_dim: 256
+        model_channels: 128
+        bottleneck_channels: 128
+        out_channels: *latent_embed_dim
+        num_res_blocks: 12
+        use_context: true
+        context_channels: 512
+
+    # CLAP Conditioning Model
     cond_stage_config:
-      film_clap_cond1:
-        cond_stage_key: text
-        conditioning_key: film
-        target: audioldm_train.conditional_models.CLAPAudioEmbeddingClassifierFreev2
-        params:
-          pretrained_path: data/checkpoints/clap_htsat_tiny.pt
-          sampling_rate: 16000
-          embed_mode: text # or text
-          amodel: HTSAT-tiny
+      target: audioldm_train.conditional_models.CLAPAudioEmbeddingClassifierFreev2
+      params:
+        pretrained_path: data/checkpoints/clap_htsat_tiny.pt
+        sampling_rate: 16000
+        embed_mode: text
+        amodel: HTSAT-tiny
 
     evaluation_params:
       unconditional_guidance_scale: 3.5
