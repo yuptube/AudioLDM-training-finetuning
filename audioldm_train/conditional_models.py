@@ -6,6 +6,9 @@ import logging
 import torch.nn as nn
 from audioldm_train.modules.clap.open_clip import create_model
 from audioldm_train.modules.clap.training.data import get_audio_features
+from imagebind.imagebind.models.imagebind_model import ModalityType
+from imagebind.imagebind.models import imagebind_model 
+from imagebind.imagebind import data
 
 import torchaudio
 from transformers import (
@@ -1334,17 +1337,56 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
             return_tensors="pt",
         )
         return {k: v.squeeze(0) for k, v in result.items()}
+    
+class ImageBindAudioEmbedding(nn.Module):
+    def __init__(self ):
+        super().__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Initialize ImageBind model
+        self.model = imagebind_model.imagebind_huge(pretrained=True).to(self.device)
+        self.model.eval()  # Set to eval mode
+    
+    def get_unconditional_condition(self , batchsize):
+        return torch.zeros((batchsize, 1024)).to(
+            self.device
+        )
 
+    def extract_audio_embedding(self, batch_audio_paths):
+        
+        with torch.no_grad():
+            inputs = {ModalityType.AUDIO: data.load_and_transform_audio_data(audio_paths=batch_audio_paths, device=self.device , clip_duration=10)}
+            embedding = self.model(inputs)[ModalityType.AUDIO]  # Shape: [1, 1024]
+            # print("Extracted audio embedding:", embedding.shape)
+        return embedding
 
+    def forward(self , batch):          
+        # print("the batch is ",batch)
+        print("batch audio is " , batch)
+
+        audio_embed = self.extract_audio_embedding(batch)
+        return audio_embed.detach().unsqueeze(1)  # Shape: [[total_audio_files, 1024]]
+        
 if __name__ == "__main__":
-    model = CLAPAudioEmbeddingClassifierFreev2(
-        pretrained_path="/mnt/bn/lqhaoheliu/exps/checkpoints/audioldm/ckpt/CLAP.pt",
-        embed_mode="text",
-        amodel="HTSAT-tiny",
-    )
-    # data = torch.randn((6, 1, int(16000*10.24)))
-    data = ["text", "text"]
-    res = model(data)
-    import ipdb
 
-    ipdb.set_trace()
+    # audio_path = "data/dataset/audioset/zip_audios/unbalanced_train_segments/unbalanced_train_segments_part1/Y-n_ERLSXuVw.wav"
+    # model = CLAPAudioEmbeddingClassifierFreev2(
+    #     pretrained_path="data/checkpoints/clap_htsat_tiny.pt",
+    #     embed_mode="text",
+    #     amodel="HTSAT-tiny",
+    # )
+    audio_files= ["data/dataset/audioset/zip_audios/unbalanced_train_segments/unbalanced_train_segments_part1/Y-n_ERLSXuVw.wav", "data/dataset/audioset/zip_audios/unbalanced_train_segments/unbalanced_train_segments_part4/Y2_0ZbmdlVxg.wav"]  # List of audio file paths
+    model = ImageBindAudioEmbedding()
+
+    # data1 = ["text1", "text2"]
+    res = model(audio_files)   # Process audio files in batches
+    print("Final embeddings shape" , res.shape)
+    print("Final embeddings:", res)
+    # model = ImageBindVideoCondition([audio_path])
+    # data = torch.randn((6, 1, int(16000*10.24)))
+
+    # res = model()
+    # res = model(data1 )
+    # print("Final embeddings:", res)
+    # import ipdb
+
+    # ipdb.set_trace()
