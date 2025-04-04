@@ -18,4 +18,5 @@ checkpoints
 condor*
 wandb
 *.mlx_submit
-*.ipynb
+
+imagebind
