@@ -73,7 +73,8 @@ def interpolate_pos_encoding(
     N = pos_embed.shape[1] - first_patch_idx  # since it's 1 if cls_token exists
     if npatch_per_img == N:
         return pos_embed
-
+    print("patches_layout[-1]" , patches_layout[-1])
+    print("patches_layout[-2]" , patches_layout[-2])
     assert (
         patches_layout[-1] == patches_layout[-2]
     ), "Interpolation of pos embed not supported for non-square layouts"

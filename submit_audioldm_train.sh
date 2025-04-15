@@ -2,11 +2,11 @@
 #SBATCH --job-name=audioldm_train
 #SBATCH --output=cluster_logs/%x_%j.out       # Standard output log
 #SBATCH --error=cluster_logs/%x_%j.err        # Standard error log
-#SBATCH --partition=debug                 # Example for 2080ti partition
-#SBATCH --gres=gpu:2
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=25G
-#SBATCH --time=0:15:00
+#SBATCH --partition=3090                 # Example for 2080ti partition
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=24:00:00
 #SBATCH --mail-type=END,FAIL        
 #SBATCH --mail-user=ys01085@surrey.ac.uk
 
@@ -28,15 +28,8 @@ fi
 
 set -e  # Exit on any error
 trap 'echo "⚠️ An error occurred while running the Python script. Exiting..." >&2; exit 1' ERR
-# $LATEST_CHECKPOINT=""
-# $CHECKPOINT_DIR=""
-# if [ -z "$LATEST_CHECKPOINT" ]; then
-# echo "No checkpoint found, starting fresh... (form audioldm -s )"
+
 python3 audioldm_train/train/latent_diffusion.py -c audioldm_train/config/audioldm_original_with_imagebind/audioldm_with_imagebind.yaml \
-    --reload_from_ckpt data/checkpoints/audioldm-s-full.ckpt
-# else
-#     echo "Resuming from checkpoint: $LATEST_CHECKPOINT"
-#     python3 latent_diffusion_slrum.py -c audioldm_train/config/audioldm_original_with_rdm/audioldm_with_rdm.yaml --reload_from_ckpt $CHECKPOINT_DIR/$LATEST_CHECKPOINT
-# fi
+    --reload_from_ckpt log/latent_diffusion/audioldm_original_with_imagebind/audioldm_with_imagebind/checkpoints/checkpoint-fad-133.00-global_step=24999.ckpt
 
 echo "✅ Training script completed successfully."

@@ -515,13 +515,16 @@ class DDPM(pl.LightningModule):
     def get_input(self, batch, k):
         # fbank, log_magnitudes_stft, label_indices, fname, waveform, clip_label, text = batch
         # fbank, stft, label_indices, fname, waveform, text = batch
+
+
+        print("batch is" , batch)
         fname, text, label_indices, waveform, stft, fbank = (
             batch["fname"],
             batch["text"],
-            batch["label_vector"],
+            batch["other"],
             batch["waveform"],
             batch["stft"],
-            batch["log_mel_spec"],
+            batch["fbank"],
         )
         # for i in range(fbank.size(0)):
         #     fb = fbank[i].numpy()

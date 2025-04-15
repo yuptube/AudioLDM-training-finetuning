@@ -108,7 +108,7 @@ model:
       target: audioldm_train.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 64 
-        extra_film_condition_dim: 512 # If you use film as extra condition, set this parameter. For example if you have two conditioning vectors each have dimension 512, then this number would be 1024
+        extra_film_condition_dim: 1024 # If you use film as extra condition, set this parameter. For example if you have two conditioning vectors each have dimension 512, then this number would be 1024
         # context_dim: 
         # - 768
         in_channels: *unet_in_channels # The input channel of the UNet model

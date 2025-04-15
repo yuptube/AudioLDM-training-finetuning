@@ -50,7 +50,7 @@ model:
   params: 
     # Autoencoder
     first_stage_config:
-      base_learning_rate: 8.0e-06
+      base_learning_rate: 4.5e-05
       target: audioldm_train.modules.latent_encoder.autoencoder.AutoencoderKL
       params: 
         reload_from_ckpt: "data/checkpoints/vae_mel_16k_64bins.ckpt"

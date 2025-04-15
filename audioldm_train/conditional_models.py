@@ -1278,7 +1278,7 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
         #     assert self.model.training == True
         # else:
         #     assert self.model.training == False
-
+        print("embed mode is " , self.embed_mode)
         # the 'fusion' truncate mode can be changed to 'rand_trunc' if run in unfusion mode
         if self.embed_mode == "audio":
             if not self.training:
@@ -1301,7 +1301,7 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
                 audio_dict = get_audio_features(
                     audio_data,
                     mel,
-                    480000,
+                    240000,
                     data_truncating="fusion",
                     data_filling="repeatpad",
                     audio_cfg=self.model_cfg["audio_cfg"],
@@ -1309,8 +1309,11 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
                 # [bs, 512]
                 embed = self.model.get_audio_embedding(audio_dict)
         elif self.embed_mode == "text":
+            assert 0
             with torch.no_grad():
                 # the 'fusion' truncate mode can be changed to 'rand_trunc' if run in unfusion mode
+                print("batch is " , batch)
+                
                 text_data = self.tokenizer(batch)
 
                 if isinstance(batch, str) or (
@@ -1352,18 +1355,18 @@ class ImageBindAudioEmbedding(nn.Module):
         )
 
     def extract_audio_embedding(self, batch_audio_paths):
-        
+        assert batch_audio_paths != ''
         with torch.no_grad():
-            inputs = {ModalityType.AUDIO: data.load_and_transform_audio_data(audio_paths=batch_audio_paths, device=self.device , clip_duration=10)}
+
+            inputs = {ModalityType.AUDIO: data.load_and_transform_audio_data(audio_paths=batch_audio_paths, device=self.device , clip_duration=10 , num_mel_bins=64 , target_length=1024)}
             embedding = self.model(inputs)[ModalityType.AUDIO]  # Shape: [1, 1024]
             # print("Extracted audio embedding:", embedding.shape)
+
         return embedding
 
     def forward(self , batch):          
         # print("the batch is ",batch)
-        print("batch audio is " , batch)
-
-        audio_embed = self.extract_audio_embedding(batch)
+        audio_embed = self.extract_audio_embedding(batch["fname"])
         return audio_embed.detach().unsqueeze(1)  # Shape: [[total_audio_files, 1024]]
         
 if __name__ == "__main__":
@@ -1376,9 +1379,9 @@ if __name__ == "__main__":
     # )
     audio_files= ["data/dataset/audioset/zip_audios/unbalanced_train_segments/unbalanced_train_segments_part1/Y-n_ERLSXuVw.wav", "data/dataset/audioset/zip_audios/unbalanced_train_segments/unbalanced_train_segments_part4/Y2_0ZbmdlVxg.wav"]  # List of audio file paths
     model = ImageBindAudioEmbedding()
-
+    batch = {"fname": audio_files}
     # data1 = ["text1", "text2"]
-    res = model(audio_files)   # Process audio files in batches
+    res = model(batch)   # Process audio files in batches
     print("Final embeddings shape" , res.shape)
     print("Final embeddings:", res)
     # model = ImageBindVideoCondition([audio_path])

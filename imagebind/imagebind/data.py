@@ -152,17 +152,16 @@ def load_and_transform_audio_data(
                     clip_timepoints[1] * sample_rate
                 ),
             ]
+            print(f"waveform_clip shape is : {waveform_clip.shape} , num mel bins is : {num_mel_bins} , target length is : {target_length}")
             waveform_melspec = waveform2melspec(
                 waveform_clip, sample_rate, num_mel_bins, target_length
             )
             all_clips.append(waveform_melspec)
-
         normalize = transforms.Normalize(mean=mean, std=std)
         all_clips = [normalize(ac).to(device) for ac in all_clips]
-
         all_clips = torch.stack(all_clips, dim=0)
         audio_outputs.append(all_clips)
-
+    
     return torch.stack(audio_outputs, dim=0)
 
 

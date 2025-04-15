@@ -113,7 +113,6 @@ class AudioDataset(Dataset):
         if data["text"] is None:
             print("Warning: The model return None on key text", fname)
             data["text"] = ""
-
         return data
 
     def text_to_filename(self, text):
