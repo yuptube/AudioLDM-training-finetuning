@@ -19,4 +19,6 @@ condor*
 wandb
 *.mlx_submit
 
-imagebind
+imagebind/.assets
+imagebind/.checkpoints
+imagebind/build
