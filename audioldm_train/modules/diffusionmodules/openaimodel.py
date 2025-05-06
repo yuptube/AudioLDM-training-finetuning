@@ -878,6 +878,17 @@ class UNetModel(nn.Module):
         h = self.middle_block(h, emb, context_list, context_attn_mask_list)
         for module in self.output_blocks:
             concate_tensor = hs.pop()
+            # if h.shape[2:] != concate_tensor.shape[2:]:
+            #     print("❌ Shape mismatch before concat!")
+            #     print("h:", h.shape)
+            #     print("concate_tensor:", concate_tensor.shape)
+            #     raise RuntimeError("Shape mismatch on spatial dims.")
+            
+            if h.shape[2] != concate_tensor.shape[2]:
+                print(f"size mismatch , interpolating from h {h.shape[2]} to concate_tensor {concate_tensor.shape[2]}"  )
+                concate_tensor = th.nn.functional.interpolate(
+                    concate_tensor, size=(h.shape[2], h.shape[3]), mode="bilinear"
+                )
             h = th.cat([h, concate_tensor], dim=1)
             h = module(h, emb, context_list, context_attn_mask_list)
         h = h.type(x.dtype)
