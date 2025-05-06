@@ -30,7 +30,7 @@ from audioldm_train.modules.audiomae.sequence_gen.sequence_input import (
 )
 import numpy as np
 from audioldm_train.modules.audiomae.sequence_gen.model import Prenet
-
+from imagebind.imagebind.data import waveform2melspec
 """
 The model forward function can return three types of data:
 1. tensor: used directly as conditioning signal
@@ -1278,7 +1278,7 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
         #     assert self.model.training == True
         # else:
         #     assert self.model.training == False
-        print("embed mode is " , self.embed_mode)
+        print("clap embed mode is " , self.embed_mode)
         # the 'fusion' truncate mode can be changed to 'rand_trunc' if run in unfusion mode
         if self.embed_mode == "audio":
             if not self.training:
@@ -1309,10 +1309,8 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
                 # [bs, 512]
                 embed = self.model.get_audio_embedding(audio_dict)
         elif self.embed_mode == "text":
-            assert 0
             with torch.no_grad():
                 # the 'fusion' truncate mode can be changed to 'rand_trunc' if run in unfusion mode
-                print("batch is " , batch)
                 
                 text_data = self.tokenizer(batch)
 
@@ -1341,33 +1339,80 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
         )
         return {k: v.squeeze(0) for k, v in result.items()}
     
-class ImageBindAudioEmbedding(nn.Module):
-    def __init__(self ):
+class ImageBindEmbedding(nn.Module):
+    def __init__(self, emb_mode="audio"):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # Initialize ImageBind model
         self.model = imagebind_model.imagebind_huge(pretrained=True).to(self.device)
         self.model.eval()  # Set to eval mode
+
+        self.emb_mode = emb_mode
+
+    def get_unconditional_condition(self, batchsize):
+        return torch.zeros((batchsize, 1024), device=self.device)
     
-    def get_unconditional_condition(self , batchsize):
-        return torch.zeros((batchsize, 1024)).to(
-            self.device
-        )
-
-    def extract_audio_embedding(self, batch_audio_paths):
-        assert batch_audio_paths != ''
+    def extract_text_embedding(self, text):
+        assert text, "got empty text list"
         with torch.no_grad():
+            inputs = {
+                ModalityType.TEXT: data.load_and_transform_text(
+                    text=text,
+                    device=self.device
+                )
+            }
+            emb1024 = self.model(inputs)[ModalityType.TEXT]  # [B,1024]
+        return emb1024
 
-            inputs = {ModalityType.AUDIO: data.load_and_transform_audio_data(audio_paths=batch_audio_paths, device=self.device , clip_duration=10 , num_mel_bins=64 , target_length=1024)}
-            embedding = self.model(inputs)[ModalityType.AUDIO]  # Shape: [1, 1024]
-            # print("Extracted audio embedding:", embedding.shape)
+    def extract_video_embedding(self, video_paths):
+        assert video_paths, "got empty video list"
+        with torch.no_grad():
+            inputs = {
+                ModalityType.VISION: data.load_and_transform_video_data(
+                    video_paths=video_paths,
+                    device=self.device,
+                    clip_duration=2,
+                    clips_per_video=5
+                )
+            }
+            emb1024 = self.model(inputs)[ModalityType.VISION]  # [B,1024]
+        return emb1024
 
-        return embedding
+    def extract_audio_embedding(self, audio_paths):
+        assert audio_paths, "got empty audio list"
+        with torch.no_grad():
+            mel = data.load_and_transform_audio_data(
+                audio_paths=audio_paths,
+                device=self.device,
+                num_mel_bins=128
+            )
 
-    def forward(self , batch):          
-        # print("the batch is ",batch)
-        audio_embed = self.extract_audio_embedding(batch["fname"])
-        return audio_embed.detach().unsqueeze(1)  # Shape: [[total_audio_files, 1024]]
+            # # the model is hard code to take in 128 bins , 284 frames input , try interpolating
+            B, clips, _ , H, W = mel.shape
+            mel = mel.view(B * clips, 1, H, W)
+            mel = F.interpolate(mel, size=(128, 204), mode="bilinear", align_corners=False)
+            mel = mel.view(B, clips, 1, 128, 204)
+
+            inputs = {ModalityType.AUDIO: mel}
+            emb1024 = self.model(inputs)[ModalityType.AUDIO]  # [B,1024]
+        return emb1024
+    
+    def switch_mode(self, emb_mode="audio"):
+        assert emb_mode in ("audio","video","text")
+        self.emb_mode=emb_mode
+
+    def forward(self, batch):
+        # pick the correct 1024-d embedding
+        if self.emb_mode == "audio":
+            emb1024 = self.extract_audio_embedding(batch)
+        elif self.emb_mode == "video":
+            emb1024 = self.extract_video_embedding(batch)
+        elif self.emb_mode == "text":
+            emb1024 = self.extract_text_embedding(batch)
+        else:
+            raise ValueError(f"Unsupported emb_mode {self.emb_mode}")
+
+        return  emb1024.unsqueeze(1).detach()
         
 if __name__ == "__main__":
 
@@ -1377,13 +1422,24 @@ if __name__ == "__main__":
     #     embed_mode="text",
     #     amodel="HTSAT-tiny",
     # )
-    audio_files= ["data/dataset/audioset/zip_audios/unbalanced_train_segments/unbalanced_train_segments_part1/Y-n_ERLSXuVw.wav", "data/dataset/audioset/zip_audios/unbalanced_train_segments/unbalanced_train_segments_part4/Y2_0ZbmdlVxg.wav"]  # List of audio file paths
-    model = ImageBindAudioEmbedding()
-    batch = {"fname": audio_files}
-    # data1 = ["text1", "text2"]
-    res = model(batch)   # Process audio files in batches
-    print("Final embeddings shape" , res.shape)
-    print("Final embeddings:", res)
+    # video_list = ["imagebind/.assets/quack.mp4"]
+    text_list=["Trumpet", "A car", "A bird"]
+    audio_files= ["trumpet.wav","imagebind/.assets/car_audio.wav","imagebind/.assets/bird_audio.wav"]  # List of audio file paths
+    model = ImageBindEmbedding(
+        emb_mode="audio"
+    )
+
+    audio_res = model(audio_files)   # Process audio files in batches
+    model.switch_mode("text")
+    text_res = model(text_list)
+    print("Final embeddings shape video_res" , text_res.shape)
+    print("Final embeddings:", text_res)
+    print("Final embeddings shape audio_res" , audio_res.shape)
+    print("Final embeddings:", audio_res)
+    print(
+    "text x Audio: ",
+    torch.softmax(text_res.squeeze(1) @ audio_res.squeeze(1).mT, dim=-1),
+    )
     # model = ImageBindVideoCondition([audio_path])
     # data = torch.randn((6, 1, int(16000*10.24)))
 
