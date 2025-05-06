@@ -504,3 +504,11 @@ def imagebind_huge(pretrained=False):
         model.load_state_dict(torch.load(checkpoint_path))
 
     return model
+
+if __name__ == "__main__":
+    input_mock_data = torch.zeros(5)
+    print(input_mock_data)
+    model = imagebind_huge(pretrained=True)
+    
+    input ={"VISION":input_mock_data}
+    model.forward(input)

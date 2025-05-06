@@ -684,3 +684,27 @@ class IMUPreprocessor(VerboseNNModule):
             "head": {},
         }
         return return_dict
+
+if __name__ == "__main__":
+    # 1) Define the conv stem exactly as in your pipeline
+    audio_kernel = (16, 16)
+    audio_stride = (10, 10)
+    audio_embed_dim = 768
+
+    audio_stem = PatchEmbedGeneric(
+    proj_stem=[nn.Conv2d(1, audio_embed_dim, kernel_size=audio_kernel, stride=audio_stride, bias=False)],
+    norm_layer=nn.LayerNorm(audio_embed_dim),)
+    # 2) “Old” spectrogram: 128 mel bins × 204 frames
+    old_layout, old_num_patches, _ = audio_stem.get_patch_layout([1, 64, 64])
+    # 3) “New” spectrogram: 128 mel bins × 1024 frames
+    new_layout, new_num_patches, _ = audio_stem.get_patch_layout([1, 128, 1024])
+    print(f"Old patches_layout = {old_layout}, n_patches = {old_num_patches}")
+    print(f"New patches_layout = {new_layout}, n_patches = {new_num_patches}")
+
+
+
+
+
+
+
+

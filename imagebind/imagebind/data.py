@@ -25,9 +25,7 @@ DEFAULT_AUDIO_FRAME_SHIFT_MS = 10  # in milliseconds
 
 
 def return_bpe_path():
-    return pkg_resources.resource_filename(
-        "imagebind", "bpe/bpe_simple_vocab_16e6.txt.gz"
-    )
+    return "imagebind/imagebind/bpe/bpe_simple_vocab_16e6.txt.gz"
 
 
 def waveform2melspec(waveform, sample_rate, num_mel_bins, target_length):
@@ -120,23 +118,26 @@ def load_and_transform_audio_data(
     audio_paths,
     device,
     num_mel_bins=128,
-    target_length=204,
     sample_rate=16000,
-    clip_duration=5,
     clips_per_video=3,
     mean=-4.268,
     std=9.138,
 ):
     if audio_paths is None:
-        return None
+        return None , None
 
     audio_outputs = []
-    clip_sampler = ConstantClipsPerVideoSampler(
-        clip_duration=clip_duration, clips_per_video=clips_per_video
-    )
 
     for audio_path in audio_paths:
         waveform, sr = torchaudio.load(audio_path)
+        # Dynamically set clip_duration to the whole audio if not given
+        clip_duration = waveform.shape[1] / sample_rate
+        assert clip_duration , "clip is returning None"
+        clip_sampler = ConstantClipsPerVideoSampler(
+            clip_duration=clip_duration,
+            clips_per_video=clips_per_video,
+        )
+
         if sample_rate != sr:
             waveform = torchaudio.functional.resample(
                 waveform, orig_freq=sr, new_freq=sample_rate
@@ -152,17 +153,29 @@ def load_and_transform_audio_data(
                     clip_timepoints[1] * sample_rate
                 ),
             ]
-            print(f"waveform_clip shape is : {waveform_clip.shape} , num mel bins is : {num_mel_bins} , target length is : {target_length}")
+               # Dynamically calculate target_length
+            duration_in_seconds = waveform_clip.shape[-1] / sample_rate
+            dynamic_target_length = int(duration_in_seconds * (1000 / DEFAULT_AUDIO_FRAME_SHIFT_MS))
+            
+            # print(f"waveform_clip target length is : {dynamic_target_length}")
             waveform_melspec = waveform2melspec(
-                waveform_clip, sample_rate, num_mel_bins, target_length
+                waveform_clip, sample_rate, num_mel_bins, dynamic_target_length
             )
             all_clips.append(waveform_melspec)
+
         normalize = transforms.Normalize(mean=mean, std=std)
         all_clips = [normalize(ac).to(device) for ac in all_clips]
         all_clips = torch.stack(all_clips, dim=0)
         audio_outputs.append(all_clips)
-    
-    return torch.stack(audio_outputs, dim=0)
+
+    min_length = min(ac.shape[-1] for ac in audio_outputs)
+    cropped_audio_outputs = [
+        ac[..., :min_length] for ac in audio_outputs
+    ]
+
+    # 4. Stack
+    return torch.stack(cropped_audio_outputs, dim=0)
+
 
 
 def crop_boxes(boxes, x_offset, y_offset):
@@ -340,3 +353,10 @@ def load_and_transform_video_data(
         video_outputs.append(all_video)
 
     return torch.stack(video_outputs, dim=0).to(device)
+
+if __name__ == "__main__":
+    test_audio = "trumpet.wav"
+    device = "cpu"
+    result = load_and_transform_audio_data(audio_paths=[test_audio] , device=device, num_mel_bins=64 , target_length=64)
+    print("the audio tensor is " , result)
+    print(" the shape of the tensor is " , result.shape)
