@@ -1,5 +1,12 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2301.12503-brightgreen.svg?style=flat-square)](https://arxiv.org/abs/2301.12503) [![arXiv](https://img.shields.io/badge/arXiv-2308.05734-brightgreen.svg?style=flat-square)](https://arxiv.org/abs/2308.05734)
 
+
+# AudioLDM imageBind branch
+This branch contains a prototype fork of AudioLDM developed as part of the dissertation project by Yat Yin, Sze Du. It integrates ImageBind embeddings to facilitate multimodal conditioning within the AudioLDM framework.
+
+There is not existing working checkpoint at the moment for clear production of audio but if interested. Email : joshuaszd@gmail.com
+
+
 # 🔊 AudioLDM training, finetuning, inference and evaluation
 
 - [Prepare Python running environment](#prepare-python-running-environment)
