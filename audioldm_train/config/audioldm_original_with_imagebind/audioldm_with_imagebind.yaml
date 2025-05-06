@@ -13,6 +13,7 @@ variables:
   optimize_ddpm_parameter: &optimize_ddpm_parameter true
   optimize_gpt: &optimize_gpt true
   warmup_steps: &warmup_steps 2000
+  imagebind_emb_dim : &imagebind_embed_dim 1024
 
 data: 
   train: ["audiocaps"]
@@ -25,7 +26,7 @@ step:
   validation_every_n_epochs: 5
   save_checkpoint_every_n_steps: 5000
   # limit_val_batches: 2
-  max_steps: 800000
+  max_steps: 250000
   save_top_k: 1
 
 preprocessing:
@@ -108,17 +109,17 @@ model:
       target: audioldm_train.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 64 
-        extra_film_condition_dim: 1024 # If you use film as extra condition, set this parameter. For example if you have two conditioning vectors each have dimension 512, then this number would be 1024
+        extra_film_condition_dim: *imagebind_embed_dim # If you use film as extra condition, set this parameter. For example if you have two conditioning vectors each have dimension 512, then this number would be 1024
         # context_dim: 
         # - 768
         in_channels: *unet_in_channels # The input channel of the UNet model
         out_channels: *latent_embed_dim # TODO might need to change
-        model_channels: 128 # TODO might need to change
+        model_channels: 192 # TODO might need to change
         attention_resolutions:
         - 8
         - 4
         - 2
-        num_res_blocks: 2
+        num_res_blocks: 4
         channel_mult: 
         - 1
         - 2
@@ -133,7 +134,9 @@ model:
       film_imagebind_cond1:
         cond_stage_key: fname
         conditioning_key: film
-        target: audioldm_train.conditional_models.ImageBindAudioEmbedding
+        target: audioldm_train.conditional_models.ImageBindEmbedding
+        params:
+          emb_mode: audio
 
     evaluation_params:
       unconditional_guidance_scale: 3.5
