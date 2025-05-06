@@ -331,7 +331,9 @@ class DDIMSampler(object):
         sqrt_one_minus_at = torch.full(
             (b, 1, 1, 1), sqrt_one_minus_alphas[index], device=device
         )
-
+        if e_t.shape != x.shape:
+            print(f"⚠️ Interpolating e_t from {e_t.shape} to {x.shape}")
+            e_t = torch.nn.functional.interpolate(e_t, size=x.shape[2:], mode="bilinear")
         # current prediction for x_0
         if self.model.parameterization != "v":
             pred_x0 = (x - sqrt_one_minus_at * e_t) / a_t.sqrt()

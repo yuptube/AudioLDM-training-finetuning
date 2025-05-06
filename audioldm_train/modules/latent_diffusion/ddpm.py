@@ -515,16 +515,13 @@ class DDPM(pl.LightningModule):
     def get_input(self, batch, k):
         # fbank, log_magnitudes_stft, label_indices, fname, waveform, clip_label, text = batch
         # fbank, stft, label_indices, fname, waveform, text = batch
-
-
-        print("batch is" , batch)
         fname, text, label_indices, waveform, stft, fbank = (
             batch["fname"],
             batch["text"],
-            batch["other"],
+            batch["label_vector"],
             batch["waveform"],
             batch["stft"],
-            batch["fbank"],
+            batch["log_mel_spec"],
         )
         # for i in range(fbank.size(0)):
         #     fb = fbank[i].numpy()
@@ -1756,26 +1753,22 @@ class LatentDiffusion(DDPM):
 
     def save_waveform(self, waveform, savepath, name="outwav"):
         for i in range(waveform.shape[0]):
-            if type(name) is str:
+            if isinstance(name, str):
                 path = os.path.join(
-                    savepath, "%s_%s_%s.wav" % (self.global_step, i, name)
+                    savepath, f"{self.global_step}_{i}_{name}.wav"
                 )
-            elif type(name) is list:
-                path = os.path.join(
-                    savepath,
-                    "%s.wav"
-                    % (
-                        os.path.basename(name[i])
-                        if (not ".wav" in name[i])
-                        else os.path.basename(name[i]).split(".")[0]
-                    ),
-                )
+            elif isinstance(name, list):
+                if i >= len(name):  # Protect against IndexError
+                    fname = f"{self.global_step}_{i}_out.wav"
+                else:
+                    base = os.path.basename(name[i])
+                    fname = base if base.endswith(".wav") else f"{base}.wav"
+                path = os.path.join(savepath, fname)
             else:
-                raise NotImplementedError
+                raise NotImplementedError("Expected name to be str or list.")
+
             todo_waveform = waveform[i, 0]
-            todo_waveform = (
-                todo_waveform / np.max(np.abs(todo_waveform))
-            ) * 0.8  # Normalize the energy of the generation output
+            todo_waveform = (todo_waveform / np.max(np.abs(todo_waveform))) * 0.8
             sf.write(path, todo_waveform, samplerate=self.sampling_rate)
 
     @torch.no_grad()
@@ -2293,11 +2286,22 @@ class LatentDiffusionVAELearnable(LatentDiffusion):
 if __name__ == "__main__":
     import yaml
 
-    model_config = "/mnt/fast/nobackup/users/hl01486/projects/general_audio_generation/stable-diffusion/models/ldm/text2img256/config.yaml"
+    model_config = "audioldm_train/config/audioldm_medium_imagebind/audioldm_medium_imagebind.yaml"
     model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
     latent_diffusion = LatentDiffusion(**model_config["model"]["params"])
+    
+    # Put model in eval to freeze dropout, BN, etc.
+    latent_diffusion.eval()
 
-    import ipdb
+    # Dummy input: shape [B, C, T, F]
+    dummy_input = torch.randn(2, 1, 256, 64).to(latent_diffusion.device)
 
-    ipdb.set_trace()
+    # Step 1: Encode + decode (test VAE path)
+    with torch.no_grad():
+        encoded = latent_diffusion.encode_first_stage(dummy_input)
+        z = latent_diffusion.get_first_stage_encoding(encoded)
+        recon = latent_diffusion.decode_first_stage(z)
+
+    print("Reconstruction output shape:", recon.shape)
+
